@@ -2,27 +2,38 @@ import json
 from sklearn.metrics import accuracy_score, f1_score
 import numpy as np
 
-TASK = 'summary' # summary selfexplanation thinkaloud paraphrasing
+TASK = 'paraphrasing' # summary selfexplanation thinkaloud paraphrasing
 ALL_TASKS = 'all_tasks'
-MODEL = TASK # TASK ALL_TASKS
+MODEL = ALL_TASKS # TASK ALL_TASKS
+MODEL_NAME = 'llama32_3b' # flant5_1b flant5_3b llama32_1b llama32_3b
+FILENAME = f"LLM-Scoring/experiments/{TASK}_generated_{MODEL_NAME}_scoring_{MODEL}.json"
 
 def extract_score_from_response(response):
-    # Split the response into lines
-    lines = response.split('\n')
+    if '\n' not in response:
+        lines = response.split('- ')
 
-    scores = {}
-    for line in lines:
-        if line.startswith('- '):
-            # Remove <|endoftext|> from the line if it exists
-            line = line.replace('<|endoftext|>', '')
-            line = line.replace('<|im_start|>', '')
-                            
+        scores = {}
+        for line in lines:
             try:
                 key, value = line.split(': ')
-                if key[2:] not in scores:
-                    scores[key[2:]] = value
+                key = key.strip()
+                value = value.strip()
+                if key not in scores:
+                    scores[key] = value
             except:
                 pass
+    else:
+        lines = response.split('\n')
+
+        scores = {}
+        for line in lines:
+            if line.startswith('- '):
+                try:
+                    key, value = line.split(': ')
+                    if key[2:] not in scores:
+                        scores[key[2:]] = value
+                except:
+                    pass
     return scores
 
 def _get_response_prompt(scoring_details, data):
@@ -59,7 +70,7 @@ def add_response_prompt_summary(dataset, scoring_details):
         response_prompt = _get_response_prompt(scoring_details, data)
         data['response_prompt'] = response_prompt
 
-data_test = json.load(open(f"LLM-Scoring/experiments/{TASK}_generated_qwen2_7b_scoring_adapter_{MODEL}.json", 'r'))
+data_test = json.load(open(FILENAME, 'r'))
 
 if TASK == 'selfexplanation':
     scoring_dict = json.load(open(f"LLM-Scoring/scoring_dicts/selfexplanation_thinkaloud_full_se.json", 'r'))
@@ -107,13 +118,10 @@ for sc in scoring_rubrics:
 
 print(f"--------------- {TASK} ---------------")
 print(f"--------------- {MODEL} ---------------")
-#print(f"Accuracy scores: {accuracy_scores}")
-#print(f"F1 scores: {f1_scores}")
-#print(f"Mean error scores: {mean_error_scores}")
 print()
 # Print these scores as a table
-print("Scoring rubric | Accuracy | F1 | Mean error")
-print("-------------- | -------- | -- | ----------")
+print("Scoring rubric | F1 | Mean error")
+print("-------------- | -- | ----------")
 for sc in scoring_rubrics:
     scoring_rubric = sc[1]
-    print(f"{scoring_rubric} | {accuracy_scores[scoring_rubric]:.2f} | {f1_scores[scoring_rubric]:.2f} | {mean_error_scores[scoring_rubric]:.2f}")
+    print(f"{scoring_rubric} | {f1_scores[scoring_rubric]:.2f} | {mean_error_scores[scoring_rubric]:.2f}")
